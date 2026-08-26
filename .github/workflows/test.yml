@@ -67,7 +67,7 @@ jobs:
     needs: build
     # Acceptance tests create real, billable CloudAxion infrastructure, so they
     # only run when a token is configured — never on pull requests from forks.
-    if: github.event_name == 'push' && github.repository_owner == 'neoledge'
+    if: github.event_name == 'push' && github.repository_owner == 'zorgatia'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

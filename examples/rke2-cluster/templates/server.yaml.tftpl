@@ -1,0 +1,75 @@
+#cloud-config
+# RKE2 server node.
+#
+# The first server initialises the cluster (cluster-init); the rest join it
+# through the supervisor port on 9345. RKE2 config lives at
+# /etc/rancher/rke2/config.yaml and is read once at service start.
+users:
+  - name: ${ssh_username}
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    ssh_authorized_keys:
+%{ for key in ssh_public_keys ~}
+      - ${key}
+%{ endfor ~}
+
+write_files:
+  - path: /etc/rancher/rke2/config.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      token: ${token}
+%{ if !bootstrap ~}
+      server: https://${first_server_ip}:9345
+%{ endif ~}
+%{ if bootstrap ~}
+      cluster-init: true
+%{ endif ~}
+      write-kubeconfig-mode: "0640"
+      tls-san:
+%{ for san in tls_sans ~}
+        - ${san}
+%{ endfor ~}
+      node-label:
+        - "neoledge.com/pool=system"
+      disable:
+        - rke2-ingress-nginx
+
+%{ if gvisor_runtimeclass ~}
+  # RKE2 applies anything dropped in this directory once the API server is up.
+  # The RuntimeClass is cluster-scoped, so it belongs on a server node even
+  # though the runtime itself is installed on the agents.
+  - path: /var/lib/rancher/rke2/server/manifests/gvisor-runtimeclass.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      apiVersion: node.k8s.io/v1
+      kind: RuntimeClass
+      metadata:
+        name: gvisor
+      handler: runsc
+      scheduling:
+        nodeSelector:
+          neoledge.com/sandbox: "true"
+        tolerations:
+          - key: sandbox
+            operator: Equal
+            value: gvisor
+            effect: NoSchedule
+%{ endif ~}
+
+runcmd:
+  # Wait for outbound connectivity before doing anything that needs it.
+  #
+  # A node's public address is attached by Terraform *after* the VM boots, so
+  # cloud-init can start before the machine has any route out. Without this the
+  # installer's curl fails silently and the node comes up with no RKE2 at all —
+  # which is exactly what happened the first time.
+  - ["sh", "-c", "for i in $(seq 1 90); do curl -sf -m 5 -o /dev/null https://get.rke2.io && exit 0; sleep 10; done; echo 'no egress after 15 minutes' >&2; exit 1"]
+  - ["sh", "-c", "curl -sfL https://get.rke2.io | ${rke2_version_env} sh -"]
+  - ["systemctl", "enable", "--now", "rke2-server.service"]
+  # Put the bundled kubectl and the admin kubeconfig somewhere ordinary.
+  - ["sh", "-c", "ln -sf /var/lib/rancher/rke2/bin/kubectl /usr/local/bin/kubectl"]
+  - ["sh", "-c", "mkdir -p /home/${ssh_username}/.kube && install -m 0600 -o ${ssh_username} /etc/rancher/rke2/rke2.yaml /home/${ssh_username}/.kube/config 2>/dev/null || true"]
+  - ["sh", "-c", "echo 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml' >> /home/${ssh_username}/.bashrc"]

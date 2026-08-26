@@ -1,0 +1,87 @@
+name: test
+
+on:
+  pull_request:
+    paths-ignore: ["README.md", "ROADMAP.md", "CLAUDE.md"]
+  push:
+    branches: [main]
+    paths-ignore: ["README.md", "ROADMAP.md", "CLAUDE.md"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build and unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - run: go vet ./...
+      - run: go build -v ./...
+
+      # Unit tests use httptest fakes and need no credentials.
+      - run: go test -race -covermode=atomic ./...
+
+  docs:
+    name: docs are up to date
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go generate ./...
+
+      - name: fail if docs/ is stale
+        run: |
+          if [ -n "$(git status --porcelain docs/)" ]; then
+            echo "docs/ is out of date — run 'go generate ./...' and commit the result."
+            git diff docs/
+            exit 1
+          fi
+
+  acceptance:
+    name: acceptance tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: build
+    # Acceptance tests create real, billable CloudAxion infrastructure, so they
+    # only run when a token is configured — never on pull requests from forks.
+    if: github.event_name == 'push' && github.repository_owner == 'neoledge'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.12.5"
+
+      - run: go test -v -timeout 120m ./internal/provider/
+        env:
+          TF_ACC: "1"
+          CLOUDAXION_API_KEY: ${{ secrets.CLOUDAXION_API_KEY }}
+          CLOUDAXION_LOCATION: ${{ secrets.CLOUDAXION_LOCATION }}
+          CLOUDAXION_BILLING_ACCOUNT_ID: ${{ secrets.CLOUDAXION_BILLING_ACCOUNT_ID }}

@@ -1,0 +1,65 @@
+#cloud-config
+# RKE2 agent (worker) node.
+#
+# Agents retry the join indefinitely, so booting one before its server is ready
+# is safe — it simply waits.
+users:
+  - name: ${ssh_username}
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    ssh_authorized_keys:
+%{ for key in ssh_public_keys ~}
+      - ${key}
+%{ endfor ~}
+
+write_files:
+  - path: /etc/rancher/rke2/config.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      server: https://${first_server_ip}:9345
+      token: ${token}
+      node-label:
+%{ for k, v in node_labels ~}
+        - "${k}=${v}"
+%{ endfor ~}
+%{ if length(node_taints) > 0 ~}
+      node-taint:
+%{ for taint in node_taints ~}
+        - "${taint}"
+%{ endfor ~}
+%{ endif ~}
+
+%{ if gvisor ~}
+  # RKE2 generates its containerd config from this template. "base" is RKE2's
+  # own configuration; appending keeps every default and adds the runsc runtime
+  # rather than replacing the file.
+  - path: /var/lib/rancher/rke2/agent/etc/containerd/config.toml.tmpl
+    permissions: "0644"
+    owner: root:root
+    content: |
+      {{ template "base" . }}
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+        runtime_type = "io.containerd.runsc.v1"
+%{ endif ~}
+
+runcmd:
+  # Wait for outbound connectivity before doing anything that needs it.
+  #
+  # A node's public address is attached by Terraform *after* the VM boots, so
+  # cloud-init can start before the machine has any route out. Without this the
+  # installer's curl fails silently and the node comes up with no RKE2 at all —
+  # which is exactly what happened the first time.
+  - ["sh", "-c", "for i in $(seq 1 90); do curl -sf -m 5 -o /dev/null https://get.rke2.io && exit 0; sleep 10; done; echo 'no egress after 15 minutes' >&2; exit 1"]
+%{ if gvisor ~}
+  # gVisor must be installed before RKE2 starts, or containerd comes up without
+  # the runsc shim and every sandboxed pod fails to schedule.
+  - ["sh", "-c", "curl -fsSL https://gvisor.dev/archive.key | gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg"]
+  - ["sh", "-c", "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main\" > /etc/apt/sources.list.d/gvisor.list"]
+  - ["apt-get", "update"]
+  - ["apt-get", "install", "-y", "runsc"]
+%{ endif ~}
+  - ["sh", "-c", "curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=agent ${rke2_version_env} sh -"]
+  - ["systemctl", "enable", "--now", "rke2-agent.service"]

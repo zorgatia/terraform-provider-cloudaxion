@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and adjust.
+
+name     = "neosce-tn"
+location = "tun01"
+
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... ops@neoledge",
+]
+
+# Reach the API and SSH from your office range only.
+allowed_api_cidrs = ["203.0.113.0/24"]
+allowed_ssh_cidrs = ["203.0.113.0/24"]
+
+# Pin for anything that has to survive a re-apply.
+rke2_version = "v1.31.4+rke2r1"
+
+server_count = 1
+server = {
+  vcpu    = 2
+  ram     = 4096
+  disk_gb = 40
+}
+
+agent_pools = {
+  general = {
+    count   = 2
+    vcpu    = 2
+    ram     = 4096
+    disk_gb = 40
+  }
+
+  # Untrusted tenant code. Tainted, and selected by the gvisor RuntimeClass.
+  sandbox = {
+    count   = 1
+    vcpu    = 2
+    ram     = 4096
+    disk_gb = 40
+    gvisor  = true
+  }
+}

@@ -1,0 +1,82 @@
+# Release configuration for the Terraform and OpenTofu registries.
+#
+# Both registries expect the same artifacts: per-platform zips, a manifest, a
+# SHA256SUMS file, and a detached GPG signature over it. The signature must be
+# binary (not ASCII-armored) and made with an RSA or DSA key — ECC is rejected.
+#
+# Requires GPG_FINGERPRINT in the environment and the secret key available to gpg.
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    # -s -w strip the binary; the version is stamped into main.version.
+    ldflags:
+      - "-s -w -X main.version={{.Version}}"
+    goos:
+      - linux
+      - darwin
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+      - arm
+    goarm:
+      - "6"
+    ignore:
+      # Combinations the registry does not expect and Go does not ship.
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+    binary: "{{ .ProjectName }}_v{{ .Version }}"
+
+archives:
+  - formats: [zip]
+    # The registry parses this exact name shape to discover platforms.
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Ship the plugin binary and nothing else. GoReleaser otherwise adds the
+    # README, LICENSE and CHANGELOG to every platform zip. An empty list is
+    # ignored, so the documented idiom is a glob that matches nothing.
+    files:
+      - none*
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  # Cut releases as drafts so the artifacts can be eyeballed before the registry
+  # webhook picks them up. Published versions are immutable.
+  draft: true
+
+  # The registry requires a versioned copy of the protocol manifest alongside the
+  # archives. GoReleaser does not know about it, so it is attached explicitly —
+  # without this the release uploads cleanly and the registry still rejects it.
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+
+changelog:
+  disable: true

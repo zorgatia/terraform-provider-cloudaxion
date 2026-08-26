@@ -1,0 +1,41 @@
+# Built provider binaries
+terraform-provider-cloudaxion
+terraform-provider-cloudaxion.exe
+dist/
+
+# Go
+*.test
+*.out
+vendor/
+
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+
+# Never commit credentials or tfvars
+*.tfvars
+*.tfvars.json
+!examples/**/*.auto.tfvars.example
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Stub
+Thumbs.db
+
+# Signing and credential material — never commit any of this
+*.asc
+*.gpg
+*.pem
+*.key
+!**/*.pub.asc
+secring.*

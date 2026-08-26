@@ -80,21 +80,48 @@ Data sources: `locations`, `vm_images`, `vm_parameters`, `host_pools`, `s3_endpo
 
 Every resource: create / read / update / delete / **import**, `timeouts`, drift detection.
 
-## M3 — Documentation and release pipeline 🟠
+## M3 — Documentation and release pipeline ✅
 
-Done: `tfplugindocs` generation wired to `go generate`, runnable examples, `.goreleaser.yml`
-(binary detached GPG signature over the checksums, as both registries require), and GitHub Actions
-for test and release.
+`tfplugindocs` generation wired to `go generate`, runnable examples for every resource,
+`.goreleaser.yml`, and GitHub Actions for test and release. See [`RELEASING.md`](RELEASING.md).
 
-Remaining: generate the RSA-4096 signing key, tag `v0.1.0`, and verify installation from a local
-filesystem mirror.
+Verified by a real GoReleaser run: **12 platform archives**, each containing only the correctly
+named plugin binary, plus the `SHA256SUMS` file. The versioned protocol manifest is attached as an
+`extra_files` entry — GoReleaser does not know about it, and without it a release uploads cleanly
+and the registry still rejects it.
 
-## M4 — Publication ⬜
+Installation from a **local filesystem mirror** is verified: it is how the RKE2 example was
+exercised before any registry existed.
 
-- Public GitHub repository `terraform-provider-cloudaxion` (lowercase, MPL-2.0)
-- **OpenTofu Registry** (primary — the platform runs OpenTofu): submit the provider and GPG key
-- **Terraform Registry** (secondary — the same GoReleaser artifacts satisfy both)
-- Verify `tofu init` resolves the provider from the registry
+CI is green on the published repository — build, unit tests, and a job that fails the build if
+generated docs are stale.
+
+`v0.1.0` is tagged locally and **deliberately not pushed**: the tag triggers the release workflow,
+which needs the signing key in place first.
+
+## M4 — Publication 🟠
+
+Done:
+
+- ✅ Public repository at <https://github.com/zorgatia/terraform-provider-cloudaxion>, MPL-2.0,
+  pushed and CI green. Scanned before publishing: no API token, no production hostnames, no real
+  addresses or account identifiers.
+- ✅ Provider address fixed as `registry.opentofu.org/zorgatia/cloudaxion`, and the Go module path
+  moved to match so `go get` resolves.
+
+Remaining — these need your signing identity and your GitHub account, so they are yours to do:
+
+1. Generate the RSA-4096 signing key and add `GPG_PRIVATE_KEY` and `PASSPHRASE` to the repository
+   secrets ([`RELEASING.md`](RELEASING.md) §1–2).
+2. `git push origin v0.1.0` — the tag is already created locally.
+3. Check the draft release has 12 archives, `SHA256SUMS`, `SHA256SUMS.sig` and the manifest,
+   then publish it.
+4. Submit to the OpenTofu Registry, and optionally the Terraform Registry.
+
+> **The namespace is permanent.** Registry namespaces cannot be renamed. Publishing under a personal
+> account is fine for now, but if this becomes infrastructure Neoledge depends on, moving it to an
+> organisation later means a new provider address and a migration for every consumer. Worth settling
+> before it has real dependants.
 
 ## M5 — Prove it end to end ✅
 

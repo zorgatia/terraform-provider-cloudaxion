@@ -98,6 +98,12 @@ templates/                 tfplugindocs templates
   `CLOUDAXION_BILLING_ACCOUNT_ID`.
 - Released versions are immutable — never retag or amend a published release; the registry pins
   checksums.
+- **Provider address is `registry.opentofu.org/zorgatia/cloudaxion`**, Go module
+  `github.com/zorgatia/terraform-provider-cloudaxion`, published from
+  <https://github.com/zorgatia/terraform-provider-cloudaxion>. Registry namespaces cannot be
+  renamed, so moving to a Neoledge organisation later means a new address and a consumer migration.
+- Release process is in [`RELEASING.md`](RELEASING.md). Never put private key material in this
+  repository, a shell command, or a chat window.
 
 ## Commands
 

@@ -55,10 +55,19 @@ a history.
 
 **OpenTofu Registry** (the primary target — the platform runs OpenTofu):
 
-1. Make your membership of the owning GitHub organisation **public** — the registry checks it.
-2. Open an issue on [`opentofu/registry`](https://github.com/opentofu/registry/issues/new/choose)
-   using the *Submit Provider* template, giving the namespace and repository.
-3. Submit the GPG **public** key through the *Submit GPG Key* template for the same namespace.
+1. Open an issue on [`opentofu/registry`](https://github.com/opentofu/registry/issues/new/choose)
+   using the *Submit Provider* template. Namespace `zorgatia`, repository
+   `terraform-provider-cloudaxion`.
+2. Submit the GPG **public** key through the *Submit GPG Key* template for the same namespace.
+
+The provider is published under a personal account. If it later moves to a Neoledge
+organisation, that is a **new namespace and a new provider address** — registry namespaces cannot
+be renamed. Everything already published under `zorgatia/cloudaxion` stays there, and existing
+configurations keep resolving. Moving means republishing under the new namespace and asking
+consumers to change their `source`. Worth settling before this has real dependants.
+
+If the repo does move to an organisation, make your membership of it **public** — the registry
+checks that before accepting a submission.
 
 **Terraform Registry** (optional, same artifacts):
 

@@ -261,7 +261,53 @@ list elements positionally, so writing the API's order into state fails the appl
 here are genuinely unordered — every rule is evaluated, there is no precedence — so the
 provider re-sorts the response to match the configured order.
 
-### 21. Object storage is not provisioned on this account
+### 21. Managed services: PostgreSQL 14.0 only, and it is nearly end-of-life
+
+Verified 2026-08-27 by creating a real package and probing the rest.
+
+**The catalogue is one item.** `postgresql` is the only service type; `mysql`, `mariadb`, `redis`,
+`mongodb`, `rabbitmq`, `elasticsearch`, `kafka` and `minio` all answer
+`Service '<name>' not found`. There is no endpoint that lists what is on offer — the only way to
+enumerate is to guess a name and read the error.
+
+**One version: `14.0`.** Every other string tested was rejected, including `13.0`, `15.0`, `16.0`,
+`17.0`, `18.0` and point releases like `14.1`, `14.5`, `14.10`. Note the shape: bare `14` fails,
+`14.0` succeeds.
+
+⚠️ **PostgreSQL 14 reaches end-of-life on 12 November 2026**, and CloudAxion offers no newer
+version and no visible upgrade path. Anything durable built on this managed service is on an
+unsupported database within months of writing. Raise it with DataXion before committing.
+
+**Creation is fast and synchronous** — the package came back `status: "active"` immediately, with a
+VM and a virtual_ip already allocated.
+
+**The admin user is not a superuser.** `wadmin` carries `createrole` and `createdb`, but not
+`rolsuper` and not `rolreplication`.
+
+**Schema-per-tenant works**, which is what decision A4 needs. The full sequence succeeds:
+`CREATE DATABASE`, `CREATE ROLE`, `CREATE SCHEMA … AUTHORIZATION`, `GRANT USAGE, CREATE ON SCHEMA`,
+`GRANT CONNECT ON DATABASE`, `ALTER ROLE … SET search_path`, `REVOKE ALL ON SCHEMA public FROM
+PUBLIC`, `CREATE TABLE`, `CREATE EXTENSION pgcrypto`.
+
+One wrinkle, and it is ordinary PostgreSQL rather than a platform limit: a non-superuser cannot
+create a schema owned by a role it is not a member of. `CREATE SCHEMA … AUTHORIZATION tenant` fails
+with `must be member of role "tenant"` unless preceded by `GRANT tenant TO wadmin`. Any onboarding
+tool has to issue that grant first.
+
+**Tenant isolation holds.** With two tenants provisioned, the second reading the first's schema is
+refused with `permission denied for schema` — the same negative test Elise Automate's chantier 3
+used to prove isolation on its own PostgreSQL.
+
+**Reaching it.** The service is private-only: `properties.service_ip` is an address on the account's
+**default network** (there is no documented way to place it elsewhere), and nothing public is bound
+at creation. Two things make it reachable:
+
+- `POST …/whitelist_addresses` with `{"ip_address": "<addr>"}` — note the field name; `ip`, `cidr`
+  and `address` are all rejected with `IP address must be specified`.
+- A floating IP assigned with `assigned_to_resource_type: "service"` and the **package** uuid as
+  `assigned_to`. Port 5432 opens on it within seconds.
+
+### 22. Object storage is not provisioned on this account
 
 `GET /v1/storage/user/keys` → 404 `{"message":"Storage account not found."}`, while
 `GET /v1/storage/bucket/list` → 200 `[]`. The bucket and S3-key resources cannot be exercised until

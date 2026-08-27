@@ -32,9 +32,35 @@ write_files:
 %{ endif ~}
 
 %{ if gvisor ~}
-  # RKE2 generates its containerd config from this template. "base" is RKE2's
-  # own configuration; appending keeps every default and adds the runsc runtime
-  # rather than replacing the file.
+  # RKE2 renders its containerd config from a template in this directory, and
+  # the plugin path for a custom runtime CHANGED with containerd 2.0:
+  #
+  #   containerd 1.7   config.toml.tmpl      [plugins."io.containerd.grpc.v1.cri"...]
+  #   containerd 2.x   config-v3.toml.tmpl   [plugins.'io.containerd.cri.v1.runtime'...]
+  #
+  # RKE2 ships containerd 2.0 from v1.31.6 / v1.32.2 onwards, so a single
+  # module has to work on both sides of that boundary. It cannot decide from
+  # `rke2_version`: that variable accepts a channel name ("stable") as readily
+  # as a version, and the channel moves.
+  #
+  # So write BOTH. The selection is safe in both directions, and documented:
+  # containerd 2.x prefers config-v3.toml.tmpl and falls back to the legacy one
+  # when it is absent; containerd 1.7 does not support v3 configuration and
+  # ignores that file entirely. The two never conflict.
+  #
+  # "base" is RKE2's own stock configuration. Extending it adds the runsc
+  # runtime without replacing a single default — a template that does NOT
+  # extend base renders a config missing root/state/address, and containerd
+  # then fails to start.
+  - path: /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.tmpl
+    permissions: "0644"
+    owner: root:root
+    content: |
+      {{ template "base" . }}
+
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.'runsc']
+        runtime_type = "io.containerd.runsc.v1"
+
   - path: /var/lib/rancher/rke2/agent/etc/containerd/config.toml.tmpl
     permissions: "0644"
     owner: root:root

@@ -5,6 +5,17 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`examples/rke2-cluster` now registers the gVisor runtime on containerd 2.x.** RKE2 ships
+  containerd 2.0 from v1.31.6 / v1.32.2 onwards, where a custom runtime moves from
+  `[plugins."io.containerd.grpc.v1.cri"…]` in `config.toml.tmpl` to
+  `[plugins.'io.containerd.cri.v1.runtime'…]` in `config-v3.toml.tmpl`. The module wrote only the
+  legacy file. Nothing was broken — RKE2 still renders a version 2 configuration from it when the
+  v3 template is absent — but that is a compatibility path, and the day it goes away the failure is
+  silent: `runsc` is no longer registered and sandboxed pods simply never schedule. The module now
+  writes both files, which is safe in both directions since containerd 1.7 ignores the v3 template.
+
 ### Added
 
 Initial provider covering the CloudAxion IaaS surface.

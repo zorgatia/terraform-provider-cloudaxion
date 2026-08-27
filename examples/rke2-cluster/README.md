@@ -30,6 +30,33 @@ Linux sandbox-proof 4.19.0-gvisor #1 SMP x86_64 GNU/Linux
 
 That kernel string is the proof: the container is running on gVisor's own kernel, not the host's.
 
+## The containerd config version
+
+Registering `runsc` means extending RKE2's containerd configuration, and the plugin path for a
+custom runtime **changed with containerd 2.0**:
+
+| containerd | template file | plugin path |
+|---|---|---|
+| 1.7 | `config.toml.tmpl` | `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]` |
+| 2.x | `config-v3.toml.tmpl` | `[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.'runsc']` |
+
+RKE2 ships containerd 2.0 from **v1.31.6 / v1.32.2** onwards, so a single module has to work on
+both sides of that line. It cannot decide from `rke2_version`: that variable accepts a channel name
+as readily as a version, and channels move.
+
+So the module writes **both** files. The selection is safe in both directions and documented
+upstream — containerd 2.x prefers `config-v3.toml.tmpl` and falls back to the legacy file when it is
+absent, while containerd 1.7 does not support v3 configuration and ignores that file entirely.
+
+Both templates start with `{{ template "base" . }}`. That is not cosmetic: a template that does not
+extend `base` renders a configuration missing `root`, `state` and `address`, and containerd then
+fails to start.
+
+> ⚠️ The end-to-end proof above was produced on RKE2 v1.31.4, i.e. **containerd 1.7**. The v3
+> template is written from the documented contract and renders correctly, but it has not yet been
+> observed registering `runsc` on a live containerd 2.x node. Until it has, treat `uname -r` inside
+> a sandboxed pod as the acceptance test on any cluster running RKE2 v1.31.6 or newer.
+
 ## Use
 
 ```bash
@@ -131,3 +158,6 @@ etcd cluster.
 - **The join token lives in state.** Anyone holding it can add a node. Treat state as a secret.
 - **`allowed_ssh_cidrs` defaults to empty**, which means no inbound SSH and therefore no way to
   fetch the kubeconfig. Set it to your own range — not `0.0.0.0/0`.
+- **No registry mirror configuration.** The module writes no `registries.yaml`, so nodes always pull
+  from the registry named in the image reference. A private registry reached through a load balancer
+  therefore depends on that load balancer supporting hairpin traffic.

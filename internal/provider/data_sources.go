@@ -303,3 +303,60 @@ func dsComputedString(description string) schema.StringAttribute {
 func dsComputedBool(description string) schema.BoolAttribute {
 	return schema.BoolAttribute{Computed: true, MarkdownDescription: description}
 }
+
+// ----------------------------------------------------------- s3_endpoint
+
+var (
+	_ datasource.DataSource              = (*s3EndpointDataSource)(nil)
+	_ datasource.DataSourceWithConfigure = (*s3EndpointDataSource)(nil)
+)
+
+// NewS3EndpointDataSource returns the cloudaxion_s3_endpoint data source.
+func NewS3EndpointDataSource() datasource.DataSource { return &s3EndpointDataSource{} }
+
+type s3EndpointDataSource struct{ dsBase }
+
+type s3EndpointModel struct {
+	Endpoint types.String `tfsdk:"endpoint"`
+	Region   types.String `tfsdk:"region"`
+	URL      types.String `tfsdk:"url"`
+}
+
+func (d *s3EndpointDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_s3_endpoint"
+}
+
+func (d *s3EndpointDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "The S3-compatible endpoint fronting object storage.\n\n" +
+			"Bucket lifecycle belongs to this provider; everything inside a bucket belongs to the " +
+			"S3 API. Point the `aws` provider at this endpoint for objects, ACLs, versioning, " +
+			"encryption and policies.\n\n" +
+			"~> On an account without object storage provisioned this returns almost nothing " +
+			"(`{\"url\": \"/\"}` was observed), which is the signal to ask the vendor to enable it.",
+		Attributes: map[string]schema.Attribute{
+			"endpoint": dsComputedString("S3 endpoint host, when the API reports one."),
+			"region":   dsComputedString("S3 region, when the API reports one."),
+			"url":      dsComputedString("Raw URL field as returned by the API."),
+		},
+	}
+}
+
+func (d *s3EndpointDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	d.configure(req, resp)
+}
+
+func (d *s3EndpointDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+	info, err := d.meta.Client.GetS3Info(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read the CloudAxion S3 endpoint", client.DescribeError(err))
+		return
+	}
+
+	state := s3EndpointModel{
+		Endpoint: nullableString(info.Endpoint),
+		Region:   nullableString(info.Region),
+		URL:      nullableString(info.URL),
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}

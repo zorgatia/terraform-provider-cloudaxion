@@ -169,6 +169,8 @@ func (p *cloudaxionProvider) Resources(_ context.Context) []func() resource.Reso
 		NewFloatingIPResource,
 		NewFloatingIPAssignmentResource,
 		NewLoadBalancerResource,
+		NewBucketResource,
+		NewS3CredentialsResource,
 	}
 }
 
@@ -178,6 +180,7 @@ func (p *cloudaxionProvider) DataSources(_ context.Context) []func() datasource.
 		NewVMImagesDataSource,
 		NewHostPoolsDataSource,
 		NewBillingAccountsDataSource,
+		NewS3EndpointDataSource,
 	}
 }
 

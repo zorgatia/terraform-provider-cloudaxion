@@ -55,6 +55,15 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
 
+  # Le manifeste doit être CHECKSUMMÉ, pas seulement joint à la release.
+  # `release.extra_files` plus bas l'attache aux artefacts ; sans la présente
+  # entrée il n'apparaît pas dans SHA256SUMS, et le registre refuse la version
+  # avec « missing SHA256 checksum for [..._manifest.json] ». Les deux blocs
+  # sont nécessaires, et il faut que les `name_template` soient identiques.
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+
 signs:
   - artifacts: checksum
     args:

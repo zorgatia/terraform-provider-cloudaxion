@@ -5,6 +5,19 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-28
+
+### Fixed
+
+- **The release manifest is now covered by `SHA256SUMS`.** `.goreleaser.yml` attached
+  `terraform-registry-manifest.json` to the GitHub release but never checksummed it, so both
+  registries refused the version with `missing SHA256 checksum for [..._manifest.json]` — an error
+  that surfaces only after publishing. `checksum.extra_files` now mirrors `release.extra_files`, and
+  the checksum file lists thirteen entries instead of twelve.
+
+  **0.1.0 is unusable and should be ignored.** It is not withdrawn, because published versions are
+  immutable; it simply never passed registry ingestion, so nothing can have consumed it.
+
 ## [0.1.0] - 2026-08-27
 
 ### Added

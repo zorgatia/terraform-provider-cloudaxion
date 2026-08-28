@@ -94,7 +94,8 @@ GoReleaser to build every platform, write `SHA256SUMS`, sign it, and open a **dr
 Check the draft has all of:
 
 - one `.zip` per platform, named `terraform-provider-cloudaxion_<version>_<os>_<arch>.zip`
-- `terraform-provider-cloudaxion_<version>_SHA256SUMS`
+- `terraform-provider-cloudaxion_<version>_SHA256SUMS` — and it must list **13** files: the twelve
+  archives *and* the manifest
 - `terraform-provider-cloudaxion_<version>_SHA256SUMS.sig`
 - `terraform-provider-cloudaxion_<version>_manifest.json`
 
@@ -108,6 +109,19 @@ Build the artifacts locally without publishing or signing:
 goreleaser release --snapshot --clean --skip=publish,sign
 ls dist/
 ```
+
+**Check the manifest is inside `SHA256SUMS`, not merely beside it.** The registry rejects a version
+whose checksum file does not cover the manifest — with `missing SHA256 checksum for
+[..._manifest.json]`, an error that appears only *after* publishing, on the registry side. It costs
+a patch release to fix, so check it here:
+
+```bash
+grep -c manifest.json dist/*SHA256SUMS   # must be 1
+```
+
+The two `extra_files` blocks in `.goreleaser.yml` are both required and must carry the same
+`name_template`: the one under `checksum:` puts the manifest in the checksum file, the one under
+`release:` attaches it to the GitHub release. Having only the second is what produced that error.
 
 To check the provider actually loads, install it into a filesystem mirror and point OpenTofu at it —
 this is how the provider was verified before any registry existed:

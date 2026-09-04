@@ -82,7 +82,9 @@ Both require the repository to be **public**, named `terraform-provider-cloudaxi
 ```bash
 go test ./...
 go generate ./...            # docs/ must be current — CI fails if it is not
-git status --porcelain docs/ # expect empty
+git diff --exit-code docs/  # must be empty -- docs/ is generated and committed
+                            # (not `git status`: with core.autocrlf on Windows it reports
+                            #  a modification whose diff is empty, and cries wolf)
 
 git tag -a v0.1.0 -m "v0.1.0"
 git push origin v0.1.0

@@ -44,10 +44,7 @@ output "sandbox_nodes" {
 
 output "ingress_address" {
   description = "Load balancer address published to clients."
-  value = var.create_load_balancer ? coalesce(
-    cloudaxion_load_balancer.ingress[0].public_address,
-    cloudaxion_load_balancer.ingress[0].private_address,
-  ) : null
+  value       = var.create_load_balancer ? cloudaxion_floating_ip.ingress[0].address : null
 }
 
 output "cluster_token" {

@@ -5,6 +5,28 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-04
+
+### Fixed
+
+- **`examples/rke2-cluster` no longer leaks the ingress address on destroy.** The load balancer was
+  created with `reserve_public_ip = true`, while every node in the same module uses
+  `reserve_public_ip = false` plus an explicitly managed `cloudaxion_floating_ip` — for the reason
+  the module's own comment gives, and which note 19 confirms applies to load balancers as well: a
+  reserved address is **not** released when its resource is destroyed, and goes on billing at the
+  higher unassigned rate.
+
+  The load balancer now follows the same pattern, with `cloudaxion_floating_ip.ingress` attached
+  through `resource_type = "load_balancer"`. `ingress_address` reads from that address.
+
+  **Worth adopting before the address is published in DNS.** `reserve_public_ip` is
+  `RequiresReplace`, so switching later replaces the load balancer and changes its address. Managed
+  as its own resource, the address now outlives the load balancer: a cluster can be destroyed and
+  rebuilt while the DNS records stay valid.
+
+  Consumers pin this module by git ref, so this reaches them only when they bump `ref=` — no
+  provider behaviour changed.
+
 ## [0.1.2] - 2026-09-04
 
 ### Fixed

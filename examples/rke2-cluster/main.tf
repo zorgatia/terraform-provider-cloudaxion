@@ -295,7 +295,11 @@ resource "cloudaxion_load_balancer" "ingress" {
   location           = var.location
   network_id         = cloudaxion_private_network.this.id
   billing_account_id = var.billing_account_id
-  reserve_public_ip  = true
+
+  # false, like the nodes, and for the same reason recorded below: an address
+  # created by `reserve_public_ip` is not released on destroy. The explicitly
+  # managed address is declared after this resource.
+  reserve_public_ip = false
 
   dynamic "rule" {
     for_each = var.ingress_ports
@@ -341,4 +345,35 @@ resource "cloudaxion_floating_ip_assignment" "node" {
   address     = cloudaxion_floating_ip.node[each.key].address
   resource_id = each.value
   location    = var.location
+}
+
+# ------------------------------------------------------- ingress address
+#
+# The load balancer's address follows the same rule, and reason 2 above applies
+# to it verbatim -- the API notes confirm the leak for load balancers too.
+#
+# It matters more here than on a node, for a reason that is not about cost:
+# this is the address published in DNS. Managed explicitly, it outlives the
+# load balancer, so a cluster can be destroyed and rebuilt while the records
+# stay valid. Reserved by the load balancer, every rebuild yields a different
+# address -- and a new round-trip through whoever operates the zone.
+#
+# `reserve_public_ip` is RequiresReplace, so this choice is cheap before the
+# records exist and expensive afterwards.
+
+resource "cloudaxion_floating_ip" "ingress" {
+  count = var.create_load_balancer ? 1 : 0
+
+  name               = "${var.name}-ingress"
+  location           = var.location
+  billing_account_id = var.billing_account_id
+}
+
+resource "cloudaxion_floating_ip_assignment" "ingress" {
+  count = var.create_load_balancer ? 1 : 0
+
+  address       = cloudaxion_floating_ip.ingress[0].address
+  resource_id   = cloudaxion_load_balancer.ingress[0].id
+  resource_type = "load_balancer"
+  location      = var.location
 }

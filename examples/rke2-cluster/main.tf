@@ -190,14 +190,17 @@ resource "cloudaxion_vm" "server_init" {
   public_keys = var.ssh_public_keys
 
   cloud_init = templatefile("${path.module}/templates/server.yaml.tftpl", {
-    ssh_username        = var.ssh_username
-    ssh_public_keys     = var.ssh_public_keys
-    token               = random_password.token.result
-    bootstrap           = true
-    first_server_ip     = ""
-    tls_sans            = local.server_public_ips
-    rke2_version_env    = local.rke2_version_env
-    gvisor_runtimeclass = local.any_gvisor
+    ssh_username    = var.ssh_username
+    ssh_public_keys = var.ssh_public_keys
+    token           = random_password.token.result
+    bootstrap       = true
+    first_server_ip = ""
+    # Only the bootstrap server carries it: the addon lives in the cluster once
+    # applied, and two servers racing on the same manifest buys nothing.
+    local_path_provisioner_version = var.local_path_provisioner_version
+    tls_sans                       = local.server_public_ips
+    rke2_version_env               = local.rke2_version_env
+    gvisor_runtimeclass            = local.any_gvisor
   })
 
   # Creation blocks until the guest is running: 33 seconds for the smallest
@@ -230,14 +233,15 @@ resource "cloudaxion_vm" "server_join" {
   public_keys = var.ssh_public_keys
 
   cloud_init = templatefile("${path.module}/templates/server.yaml.tftpl", {
-    ssh_username        = var.ssh_username
-    ssh_public_keys     = var.ssh_public_keys
-    token               = random_password.token.result
-    bootstrap           = false
-    first_server_ip     = cloudaxion_vm.server_init.private_ipv4
-    tls_sans            = concat([cloudaxion_vm.server_init.private_ipv4], local.server_public_ips)
-    rke2_version_env    = local.rke2_version_env
-    gvisor_runtimeclass = local.any_gvisor
+    ssh_username                   = var.ssh_username
+    ssh_public_keys                = var.ssh_public_keys
+    token                          = random_password.token.result
+    bootstrap                      = false
+    local_path_provisioner_version = ""
+    first_server_ip                = cloudaxion_vm.server_init.private_ipv4
+    tls_sans                       = concat([cloudaxion_vm.server_init.private_ipv4], local.server_public_ips)
+    rke2_version_env               = local.rke2_version_env
+    gvisor_runtimeclass            = local.any_gvisor
   })
 
   timeouts {

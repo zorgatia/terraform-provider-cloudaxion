@@ -5,6 +5,26 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-04
+
+### Added
+
+- **`examples/rke2-cluster` installs a storage class.** RKE2 ships **none** -- unlike k3s, which
+  bundles Rancher's local-path-provisioner. A cluster built by this module therefore had no
+  `StorageClass` at all, and every `PersistentVolumeClaim` stayed `Pending`: PostgreSQL and its
+  WAL, the secret store, object storage, Grafana, Prometheus. Nothing said so at apply time --
+  `kubectl get storageclass` simply answered `No resources found`, and the pods hung.
+
+  The bootstrap server now drops the pinned upstream manifest into RKE2's auto-deploy directory
+  before the service starts, so the class exists on the first reconcile. Controlled by
+  `local_path_provisioner_version`; set it to `""` for a cluster bringing its own CSI -- which a
+  production cell wants, a local-path volume being bound to its node and lost with it.
+
+  The class is named `local-path` and is not marked cluster-default, matching upstream.
+
+  Adopting this replaces the servers: `cloud_init` is `RequiresReplace`. On a running cluster the
+  same manifest can be applied by hand instead, and the module change kept for the next rebuild.
+
 ## [0.1.4] - 2026-09-04
 
 ### Fixed

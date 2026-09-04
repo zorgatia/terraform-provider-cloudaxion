@@ -63,6 +63,28 @@ variable "ssh_username" {
   default     = "ops"
 }
 
+variable "local_path_provisioner_version" {
+  description = <<-EOT
+    Version of Rancher's local-path-provisioner to install on the bootstrap
+    server, or "" to install nothing.
+
+    RKE2 ships **no storage class at all** -- unlike k3s, which bundles this
+    exact provisioner. Without one, every PersistentVolumeClaim stays `Pending`
+    and nothing stateful ever schedules: databases, object storage, monitoring,
+    a secret store. The failure is silent at apply time and surfaces as pods
+    that never leave `Pending`.
+
+    Set to "" when the cluster brings its own CSI. A production cell wants
+    Longhorn rather than this: a local-path volume is bound to its node and
+    lost with it.
+
+    The class is named `local-path` and is NOT marked as the cluster default,
+    matching upstream -- reference it explicitly.
+  EOT
+  type        = string
+  default     = "v0.0.37"
+}
+
 variable "server_count" {
   description = <<-EOT
     Number of RKE2 server (control plane) nodes.

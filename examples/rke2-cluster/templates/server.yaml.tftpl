@@ -68,6 +68,12 @@ runcmd:
   # which is exactly what happened the first time.
   - ["sh", "-c", "for i in $(seq 1 90); do curl -sf -m 5 -o /dev/null https://get.rke2.io && exit 0; sleep 10; done; echo 'no egress after 15 minutes' >&2; exit 1"]
   - ["sh", "-c", "curl -sfL https://get.rke2.io | ${rke2_version_env} sh -"]
+%{ if local_path_provisioner_version != "" ~}
+  # RKE2 ships no storage class. Dropped in the auto-deploy directory BEFORE
+  # the server starts, so it is applied on the very first reconcile and PVCs
+  # can bind from the outset. Pinned; see the variable for why it is optional.
+  - ["sh", "-c", "curl -sfL -o /var/lib/rancher/rke2/server/manifests/local-path-storage.yaml https://raw.githubusercontent.com/rancher/local-path-provisioner/${local_path_provisioner_version}/deploy/local-path-storage.yaml"]
+%{ endif ~}
   - ["systemctl", "enable", "--now", "rke2-server.service"]
   # Put the bundled kubectl and the admin kubeconfig somewhere ordinary.
   - ["sh", "-c", "ln -sf /var/lib/rancher/rke2/bin/kubectl /usr/local/bin/kubectl"]

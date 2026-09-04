@@ -170,8 +170,9 @@ func (c *Client) DeleteDisk(ctx context.Context, location, uuid string) error {
 // DiskAttachment is the result of attaching a disk, carrying the guest device
 // name the volume appears as.
 type DiskAttachment struct {
-	// Name is the guest device, for example "vdb". The API also exposes it under
-	// /dev/disk/by-id/virtio-<uuid>, which is the stable path to use in
+	// Name is the guest device, for example "vdb". The volume also appears under
+	// /dev/disk/by-id/virtio-<uuid truncated to 20 characters> — the virtio-blk
+	// serial field is capped at 20 bytes — which is the stable path to use in
 	// cloud-init and fstab.
 	Name string `json:"name"`
 	UUID string `json:"uuid"`

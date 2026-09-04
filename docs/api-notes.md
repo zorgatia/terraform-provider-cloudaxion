@@ -313,6 +313,34 @@ at creation. Two things make it reachable:
 `GET /v1/storage/bucket/list` → 200 `[]`. The bucket and S3-key resources cannot be exercised until
 object storage is enabled. `GET /v1/storage/api/s3` returns `{"url": "/"}` rather than an endpoint.
 
+### 23. The `by-id` disk path truncates the UUID to 20 characters
+
+`/dev/disk/by-id/virtio-<volume_id>` — the path this provider's own documentation recommended until
+2026-09-04 — **never exists**. udev builds that link from the virtio-blk *serial* field, which is
+capped at **20 bytes**, so the 36-character volume UUID is cut short.
+
+Measured on `tun01`, 2026-09-04, on a VM with a 20 GiB data volume attached:
+
+| | |
+|---|---|
+| volume UUID | `42876465-0857-4cc7-966a-c183f80d06ef` |
+| link actually created | `virtio-42876465-0857-4cc7-9` (20 characters of UUID) |
+| boot disk, same rule | `virtio-11edc97a-60e6-4824-8` |
+
+The correct interpolation is therefore:
+
+```hcl
+"/dev/disk/by-id/virtio-${substr(cloudaxion_block_volume.data.id, 0, 20)}"
+```
+
+**Why this one bites.** Nothing fails at apply time: the VM is created, the volume is attached,
+`device` comes back as `vdb`, and OpenTofu reports success. The failure happens later and elsewhere —
+`mkfs` inside cloud-init, against a path that does not exist — and the only visible symptom is a
+service that never starts and a port that refuses connections.
+
+Two volumes would have to share a 20-character prefix to collide, which is not a practical risk;
+`device` remains the authoritative value if an exact match is ever needed.
+
 ## Basics
 
 | | |

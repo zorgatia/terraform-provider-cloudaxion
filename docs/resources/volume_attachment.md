@@ -4,14 +4,14 @@ page_title: "cloudaxion_volume_attachment Resource - cloudaxion"
 subcategory: ""
 description: |-
   Attaches a cloudaxion_block_volume to a cloudaxion_vm.
-  ~> The guest device name in device is not stable across reboots. Mount by /dev/disk/by-id/virtio-<volume_id> instead, which is what CloudAxion guarantees.
+  ~> The guest device name in device is not stable across reboots. Mount by /dev/disk/by-id/virtio-<first 20 characters of volume_id> instead. udev builds that link from the virtio-blk serial field, which is capped at 20 bytes, so the 36-character UUID is truncated — see the example below.
 ---
 
 # cloudaxion_volume_attachment (Resource)
 
 Attaches a `cloudaxion_block_volume` to a `cloudaxion_vm`.
 
-~> The guest device name in `device` is **not stable across reboots**. Mount by `/dev/disk/by-id/virtio-<volume_id>` instead, which is what CloudAxion guarantees.
+~> The guest device name in `device` is **not stable across reboots**. Mount by `/dev/disk/by-id/virtio-<first 20 characters of volume_id>` instead. udev builds that link from the virtio-blk serial field, which is capped at 20 bytes, so the 36-character UUID is truncated — see the example below.
 
 ## Example Usage
 
@@ -22,8 +22,13 @@ resource "cloudaxion_volume_attachment" "data" {
 }
 
 # The guest device name is not stable across reboots. Mount by id instead.
+#
+# The UUID is TRUNCATED to its first 20 characters: udev builds the link from
+# the virtio-blk serial field, which is capped at 20 bytes. Interpolating the
+# full 36-character UUID yields a path that never exists, and the failure is
+# silent until mkfs or mount runs. Verified on tun01, 2026-09-04.
 output "stable_device_path" {
-  value = "/dev/disk/by-id/virtio-${cloudaxion_block_volume.data.id}"
+  value = "/dev/disk/by-id/virtio-${substr(cloudaxion_block_volume.data.id, 0, 20)}"
 }
 ```
 
@@ -41,7 +46,7 @@ output "stable_device_path" {
 
 ### Read-Only
 
-- `device` (String) Guest device name reported at attach time, for example `vdb`. Not stable across reboots — prefer `/dev/disk/by-id/virtio-<volume_id>`.
+- `device` (String) Guest device name reported at attach time, for example `vdb`. Not stable across reboots — prefer `/dev/disk/by-id/virtio-<volume_id truncated to 20 characters>`.
 - `id` (String) Composite identifier, `volume_id:vm_id`.
 
 ## Import

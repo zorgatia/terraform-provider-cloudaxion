@@ -5,6 +5,24 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-04
+
+### Fixed
+
+- **The `by-id` disk path documented on `cloudaxion_volume_attachment` was wrong.** The resource
+  description, the `device` attribute and the example all pointed at
+  `/dev/disk/by-id/virtio-<volume_id>` — "which is what CloudAxion guarantees". That path never
+  exists. udev builds the link from the virtio-blk *serial* field, which is capped at 20 bytes, so
+  the 36-character volume UUID is truncated. The correct interpolation is
+  `substr(cloudaxion_block_volume.data.id, 0, 20)`.
+
+  Nothing fails at apply time — the VM is created, the volume is attached, `device` comes back as
+  `vdb`, and the plan reports success. The mistake only surfaces inside the guest, when `mkfs` or
+  `mount` runs against a path that is not there, which makes it expensive to diagnose.
+
+  Measured on `tun01` on 2026-09-04 and recorded as note 23 in `docs/api-notes.md`. No behaviour
+  changes: this is guidance carried in schema descriptions, the example and the generated docs.
+
 ## [0.1.1] - 2026-08-28
 
 ### Fixed

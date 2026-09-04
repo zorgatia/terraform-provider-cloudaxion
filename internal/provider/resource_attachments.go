@@ -210,7 +210,9 @@ func (r *volumeAttachmentResource) Schema(_ context.Context, _ resource.SchemaRe
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Attaches a `cloudaxion_block_volume` to a `cloudaxion_vm`.\n\n" +
 			"~> The guest device name in `device` is **not stable across reboots**. Mount by " +
-			"`/dev/disk/by-id/virtio-<volume_id>` instead, which is what CloudAxion guarantees.",
+			"`/dev/disk/by-id/virtio-<first 20 characters of volume_id>` instead. udev builds " +
+			"that link from the virtio-blk serial field, which is capped at 20 bytes, so the " +
+			"36-character UUID is truncated — see the example below.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -237,8 +239,9 @@ func (r *volumeAttachmentResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"device": computedString(
-				"Guest device name reported at attach time, for example `vdb`. " +
-					"Not stable across reboots — prefer `/dev/disk/by-id/virtio-<volume_id>`."),
+				"Guest device name reported at attach time, for example `vdb`. Not stable " +
+					"across reboots — prefer `/dev/disk/by-id/virtio-<volume_id truncated to 20 " +
+					"characters>`."),
 		},
 	}
 }

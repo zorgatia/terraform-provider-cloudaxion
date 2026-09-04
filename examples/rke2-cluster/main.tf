@@ -49,6 +49,24 @@ locals {
   # when it has one, otherwise its private address for use from inside.
   kubeconfig_host = var.node_public_ips ? cloudaxion_floating_ip.node["server-1"].address : cloudaxion_vm.server_init.private_ipv4
 
+  # Node names, derived from variables ALONE -- no resource is referenced here.
+  #
+  # That is the whole point. The floating IPs used to be keyed on `all_nodes`,
+  # which maps a name to a VM *id*, so every address depended on its VM. A
+  # server therefore could not carry its own public address in `tls-san`: the
+  # address depended on the VM whose cloud-init needed it, which is a cycle.
+  # Keyed on names, the addresses are created first and the cycle is gone.
+  node_keys = toset(concat(
+    [for index in range(var.server_count) : "server-${index + 1}"],
+    keys(local.agent_nodes),
+  ))
+
+  # The addresses clients reach the API server on. Every server carries all of
+  # them, so any of them can serve a kubeconfig.
+  server_public_ips = var.node_public_ips ? [
+    for index in range(var.server_count) : cloudaxion_floating_ip.node["server-${index + 1}"].address
+  ] : []
+
   # Every node, keyed for the floating-IP fan-out.
   all_nodes = merge(
     { for index, vm in local.servers : "server-${index + 1}" => vm.id },
@@ -177,7 +195,7 @@ resource "cloudaxion_vm" "server_init" {
     token               = random_password.token.result
     bootstrap           = true
     first_server_ip     = ""
-    tls_sans            = []
+    tls_sans            = local.server_public_ips
     rke2_version_env    = local.rke2_version_env
     gvisor_runtimeclass = local.any_gvisor
   })
@@ -217,7 +235,7 @@ resource "cloudaxion_vm" "server_join" {
     token               = random_password.token.result
     bootstrap           = false
     first_server_ip     = cloudaxion_vm.server_init.private_ipv4
-    tls_sans            = [cloudaxion_vm.server_init.private_ipv4]
+    tls_sans            = concat([cloudaxion_vm.server_init.private_ipv4], local.server_public_ips)
     rke2_version_env    = local.rke2_version_env
     gvisor_runtimeclass = local.any_gvisor
   })
@@ -332,7 +350,7 @@ resource "cloudaxion_load_balancer" "ingress" {
 #      higher unassigned rate. Managed here, `tofu destroy` releases it.
 
 resource "cloudaxion_floating_ip" "node" {
-  for_each = var.node_public_ips ? local.all_nodes : {}
+  for_each = var.node_public_ips ? local.node_keys : toset([])
 
   name               = "${var.name}-${each.key}"
   location           = var.location

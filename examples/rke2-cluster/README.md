@@ -76,6 +76,10 @@ RKE2 writes its kubeconfig to `/etc/rancher/rke2/rke2.yaml` with `127.0.0.1` as 
 command copies it over SSH and rewrites the address. CloudAxion has no metadata or console API to
 read it out any other way.
 
+The rewrite verifies because every server carries every server's public address in its API
+certificate's `tls-san`. That is why the node addresses are keyed on node *names* rather than VM
+ids: an address keyed on a VM id would depend on the VM whose cloud-init needs it.
+
 Scheduling onto the sandbox pool needs both the RuntimeClass and a toleration:
 
 ```yaml

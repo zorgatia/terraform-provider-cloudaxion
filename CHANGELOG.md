@@ -5,6 +5,27 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-04
+
+### Fixed
+
+- **`examples/rke2-cluster` produced a kubeconfig that could not connect.** `kubeconfig_command`
+  rewrites the server URL to the bootstrap node's public address, but the API server certificate
+  never carried it — `tls_sans` was empty — so `kubectl` failed with `x509: certificate is valid
+  for 127.0.0.1, ::1, 10.2.220.3, 10.43.0.1, not <public address>`.
+
+  The cause was a dependency the module could not express. `cloudaxion_floating_ip.node` was keyed
+  on a map of node name to **VM id**, so every address depended on its VM — and a server's
+  cloud-init could not carry its own address without forming a cycle. Addresses are now keyed on
+  node **names**, derived from `server_count` and `agent_pools` alone, so they are created before
+  the VMs; every server then receives every server public address in `tls-san`.
+
+  Attachment order is unchanged: the address is still assigned after the VM boots, so the
+  wait-for-connectivity loop in the cloud-init remains necessary (note 19).
+
+  Adopting this replaces the servers — `cloud_init` is `RequiresReplace`. Cheapest on an empty
+  cluster.
+
 ## [0.1.3] - 2026-09-04
 
 ### Fixed
